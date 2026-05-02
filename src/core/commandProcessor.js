@@ -1,3 +1,4 @@
+import { planDecision } from "./decisionPlanner.js";
 import { validateCommand } from "./commandValidator.js";
 import { enforceRules } from "./enforcement.js";
 import { reasonAboutCommand } from "./decisionReasoner.js";
@@ -59,12 +60,17 @@ export function processCommand(cmd) {
     return result;
   }
 
-  const result = {
-    status: "approved",
-    command: validation.command,
-    enforcement,
-    reasoning
-  };
+  const plan = planDecision(validation.command, {
+  history
+});
+
+const result = {
+  status: "approved",
+  command: validation.command,
+  enforcement,
+  reasoning,
+  plan
+};
 
   storeMemory({ cmd, result });
   return result;
