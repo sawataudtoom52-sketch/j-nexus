@@ -5,12 +5,22 @@ const testCommands = [
   {},
   { type: "MOVE" },
   { payload: { x: 10 } },
-  { type: "MOVE", payload: { x: 10, y: 20 } }
+
+  // ✅ valid command
+  { type: "MOVE", payload: { x: 10, y: 20 } },
+
+  // ⚠️ risky command
+  { type: "ATTACK", payload: { target: "unknown" } },
+
+  // 🚨 high risk
+  { type: "SELF_DESTRUCT", payload: { immediate: true } }
 ];
 
-for (const cmd of testCommands) {
+testCommands.forEach((cmd, index) => {
+  console.log(`\nTest Case ${index + 1}`);
+  console.log("Input:", cmd);
+
   const result = processCommand(cmd);
-  console.log("INPUT:", cmd);
-  console.log("RESULT:", result);
-  console.log("-------------");
-}
+
+  console.log("Result:", result);
+});
