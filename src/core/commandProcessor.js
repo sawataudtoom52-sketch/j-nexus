@@ -1,5 +1,6 @@
 import { validateCommand } from "./commandValidator.js";
 import { enforceRules } from "./enforcement.js";
+import { reasonAboutCommand } from "./decisionReasoner.js";
 
 export function processCommand(cmd) {
   const validation = validateCommand(cmd);
@@ -22,9 +23,21 @@ export function processCommand(cmd) {
     };
   }
 
+  const reasoning = reasonAboutCommand(validation.command);
+
+  if (reasoning.decision === "reject") {
+    return {
+      status: "rejected",
+      stage: "reasoning",
+      risk: reasoning.risk,
+      reasons: reasoning.reasons
+    };
+  }
+
   return {
     status: "approved",
     command: validation.command,
-    enforcement
+    enforcement,
+    reasoning
   };
 }
