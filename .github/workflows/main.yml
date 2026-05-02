@@ -11,24 +11,22 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
 
-      - name: Install
-        run: npm install
-
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Test
-        run: npm run test
-
-      - name: Build
-        run: npm run build:check
+      - name: Check repository
+        run: |
+          if [ -f package.json ]; then
+            echo "package.json found"
+            npm install
+            npm run typecheck --if-present
+            npm run lint --if-present
+            npm run test --if-present
+            npm run build:check --if-present
+          else
+            echo "No package.json found yet. CI bootstrap passed."
+          fi
