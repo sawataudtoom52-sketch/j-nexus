@@ -3,7 +3,7 @@ name: J-NEXUS CI
 on:
   pull_request:
   push:
-    branches: [develop]
+    branches: [main, develop]
 
 jobs:
   guard:
