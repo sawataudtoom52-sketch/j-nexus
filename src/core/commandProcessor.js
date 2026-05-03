@@ -3,9 +3,11 @@ import { validateCommand } from "./commandValidator.js";
 import { enforceRules } from "./enforcement.js";
 import { reasonAboutCommand } from "./decisionReasoner.js";
 import { storeMemory, getRecentMemory } from "./memoryStore.js";
+
 import { verifyCommand } from "../security/auth.js";
 import { checkPolicy } from "../security/policy.js";
 import { recordAudit } from "../security/audit.js";
+import { evaluateTrust } from "../security/guard.js";
 
 export function processCommand(cmd) {
 
@@ -33,7 +35,19 @@ export function processCommand(cmd) {
     return result;
   }
 
-  // 🧠 MEMORY CONTEXT
+  // 🧠 TRUST GUARD
+  const trustCheck = evaluateTrust(cmd);
+  if (trustCheck.flagged) {
+    const result = {
+      status: "rejected",
+      stage: "guard",
+      reason: "Low trust command",
+      trust: trustCheck.trust
+    };
+    recordAudit({ cmd, result });
+    return result;
+  }
+
   const history = getRecentMemory(5);
 
   // ✅ VALIDATION
@@ -44,7 +58,9 @@ export function processCommand(cmd) {
       stage: "validation",
       reason: validation.reason
     };
-    storeMemory({ cmd, result });
+    if (!trustCheck.flagged) {
+      storeMemory({ cmd, result, trust: trustCheck.trust });
+    }
     recordAudit({ cmd, result });
     return result;
   }
@@ -57,7 +73,9 @@ export function processCommand(cmd) {
       stage: "enforcement",
       reason: enforcement.reason || "Command failed enforcement"
     };
-    storeMemory({ cmd, result });
+    if (!trustCheck.flagged) {
+      storeMemory({ cmd, result, trust: trustCheck.trust });
+    }
     recordAudit({ cmd, result });
     return result;
   }
@@ -72,7 +90,9 @@ export function processCommand(cmd) {
       risk: reasoning.risk,
       reasons: reasoning.reasons
     };
-    storeMemory({ cmd, result });
+    if (!trustCheck.flagged) {
+      storeMemory({ cmd, result, trust: trustCheck.trust });
+    }
     recordAudit({ cmd, result });
     return result;
   }
@@ -85,7 +105,9 @@ export function processCommand(cmd) {
       reasons: reasoning.reasons,
       requiredApproval: reasoning.requiredApproval || "operator"
     };
-    storeMemory({ cmd, result });
+    if (!trustCheck.flagged) {
+      storeMemory({ cmd, result, trust: trustCheck.trust });
+    }
     recordAudit({ cmd, result });
     return result;
   }
@@ -101,8 +123,10 @@ export function processCommand(cmd) {
     plan
   };
 
-  storeMemory({ cmd, result });
-  recordAudit({ cmd, result });
+  if (!trustCheck.flagged) {
+    storeMemory({ cmd, result, trust: trustCheck.trust });
+  }
 
+  recordAudit({ cmd, result });
   return result;
 }
