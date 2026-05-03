@@ -1,0 +1,14 @@
+const auditLog = [];
+
+export function recordAudit(entry) {
+  const record = {
+    ...entry,
+    timestamp: new Date().toISOString()
+  };
+
+  auditLog.push(record);
+}
+
+export function getAuditLog(limit = 50) {
+  return auditLog.slice(-limit);
+}
