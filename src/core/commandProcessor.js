@@ -1,3 +1,4 @@
+import { buildExplanation } from "./explain.js";
 import { planDecision } from "./decisionPlanner.js";
 import { validateCommand } from "./commandValidator.js";
 import { enforceRules } from "./enforcement.js";
@@ -10,39 +11,42 @@ import { recordAudit } from "../security/audit.js";
 import { evaluateTrust } from "../security/guard.js";
 
 export function processCommand(cmd) {
-
-  // 🔐 AUTH
   const auth = verifyCommand(cmd);
   if (!auth.valid) {
     const result = {
       status: "rejected",
       stage: "auth",
-      reason: auth.reason
+      reason: auth.reason,
+      explanation: buildExplanation({ cmd, stage: "auth" })
     };
     recordAudit({ cmd, result });
     return result;
   }
 
-  // 🛡 POLICY
   const policy = checkPolicy(cmd, cmd.role || "operator");
   if (!policy.allowed) {
     const result = {
       status: "rejected",
       stage: "policy",
-      reason: policy.reason
+      reason: policy.reason,
+      explanation: buildExplanation({ cmd, stage: "policy", policy })
     };
     recordAudit({ cmd, result });
     return result;
   }
 
-  // 🧠 TRUST GUARD
   const trustCheck = evaluateTrust(cmd);
   if (trustCheck.flagged) {
     const result = {
       status: "rejected",
       stage: "guard",
       reason: "Low trust command",
-      trust: trustCheck.trust
+      trust: trustCheck.trust,
+      explanation: buildExplanation({
+        cmd,
+        stage: "guard",
+        trust: trustCheck.trust
+      })
     };
     recordAudit({ cmd, result });
     return result;
@@ -50,37 +54,42 @@ export function processCommand(cmd) {
 
   const history = getRecentMemory(5);
 
-  // ✅ VALIDATION
   const validation = validateCommand(cmd);
   if (!validation.valid) {
     const result = {
       status: "rejected",
       stage: "validation",
-      reason: validation.reason
+      reason: validation.reason,
+      explanation: buildExplanation({
+        cmd,
+        stage: "validation",
+        trust: trustCheck.trust
+      })
     };
-    if (!trustCheck.flagged) {
-      storeMemory({ cmd, result, trust: trustCheck.trust });
-    }
+
+    storeMemory({ cmd, result, trust: trustCheck.trust });
     recordAudit({ cmd, result });
     return result;
   }
 
-  // ⚙ ENFORCEMENT
   const enforcement = enforceRules(validation.command);
   if (enforcement.status !== "validated") {
     const result = {
       status: "rejected",
       stage: "enforcement",
-      reason: enforcement.reason || "Command failed enforcement"
+      reason: enforcement.reason || "Command failed enforcement",
+      explanation: buildExplanation({
+        cmd,
+        stage: "enforcement",
+        trust: trustCheck.trust
+      })
     };
-    if (!trustCheck.flagged) {
-      storeMemory({ cmd, result, trust: trustCheck.trust });
-    }
+
+    storeMemory({ cmd, result, trust: trustCheck.trust });
     recordAudit({ cmd, result });
     return result;
   }
 
-  // 🤖 REASONING
   const reasoning = reasonAboutCommand(validation.command, history);
 
   if (reasoning.decision === "reject") {
@@ -88,11 +97,16 @@ export function processCommand(cmd) {
       status: "rejected",
       stage: "reasoning",
       risk: reasoning.risk,
-      reasons: reasoning.reasons
+      reasons: reasoning.reasons,
+      explanation: buildExplanation({
+        cmd,
+        stage: "reasoning",
+        reasoning,
+        trust: trustCheck.trust
+      })
     };
-    if (!trustCheck.flagged) {
-      storeMemory({ cmd, result, trust: trustCheck.trust });
-    }
+
+    storeMemory({ cmd, result, trust: trustCheck.trust });
     recordAudit({ cmd, result });
     return result;
   }
@@ -103,16 +117,20 @@ export function processCommand(cmd) {
       stage: "reasoning",
       risk: reasoning.risk,
       reasons: reasoning.reasons,
-      requiredApproval: reasoning.requiredApproval || "operator"
+      requiredApproval: reasoning.requiredApproval || "operator",
+      explanation: buildExplanation({
+        cmd,
+        stage: "reasoning",
+        reasoning,
+        trust: trustCheck.trust
+      })
     };
-    if (!trustCheck.flagged) {
-      storeMemory({ cmd, result, trust: trustCheck.trust });
-    }
+
+    storeMemory({ cmd, result, trust: trustCheck.trust });
     recordAudit({ cmd, result });
     return result;
   }
 
-  // 📊 PLANNING
   const plan = planDecision(validation.command, { history });
 
   const result = {
@@ -120,13 +138,16 @@ export function processCommand(cmd) {
     command: validation.command,
     enforcement,
     reasoning,
-    plan
+    plan,
+    explanation: buildExplanation({
+      cmd,
+      stage: "approved",
+      reasoning,
+      trust: trustCheck.trust
+    })
   };
 
-  if (!trustCheck.flagged) {
-    storeMemory({ cmd, result, trust: trustCheck.trust });
-  }
-
+  storeMemory({ cmd, result, trust: trustCheck.trust });
   recordAudit({ cmd, result });
   return result;
 }
